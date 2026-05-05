@@ -25,6 +25,31 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             ShowWindow(hwnd, isVisible ? SW_SHOW : SW_HIDE);
             return 0;
 
+        case WM_RBUTTONUP: {
+            POINT pt;
+            GetCursorPos(&pt);
+            
+            // Check if we right-clicked a zone
+            int zoneIdx = g_zoneManager.HitTest(pt);
+            if (zoneIdx != -1) {
+                HMENU hMenu = CreatePopupMenu();
+                AppendMenu(hMenu, MF_STRING, 1001, "Change Color");
+                AppendMenu(hMenu, MF_STRING, 1002, "Rename Zone");
+                
+                int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y, 0, hwnd, NULL);
+                DestroyMenu(hMenu);
+                
+                if (cmd == 1001) {
+                    // Logic to open color dialog (stubbed for now)
+                    MessageBox(hwnd, "Color Picker Dialog would open here.", "Customize", MB_OK);
+                } else if (cmd == 1002) {
+                    // Logic to open rename dialog
+                    MessageBox(hwnd, "Rename Dialog would open here.", "Customize", MB_OK);
+                }
+            }
+            return 0;
+        }
+
         case WM_DESTROY:
             PostQuitMessage(0);
             return 0;
