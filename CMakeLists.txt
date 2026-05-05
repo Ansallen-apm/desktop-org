@@ -15,6 +15,8 @@ set(SOURCES
     src/main.cpp
     src/desktop_hooker.cpp
     src/zone_manager.cpp
+    src/icon_manager.cpp
+    src/auto_sorter.cpp
 )
 
 # Executable

@@ -1,9 +1,12 @@
 #include <windows.h>
 #include "desktop_hooker.h"
 #include "zone_manager.h"
+#include "icon_manager.h"
+#include "auto_sorter.h"
 
 // Global zone manager for now
 ZoneManager g_zoneManager;
+IconManager g_iconManager;
 
 // Window Procedure
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -49,6 +52,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     
     RECT r2 = {500, 100, 800, 300};
     g_zoneManager.AddZone(r2, "Personal", RGB(150, 100, 50));
+
+    if (g_iconManager.Initialize()) {
+        // Arrange first 5 icons into the Work Files zone as a test
+        int count = g_iconManager.GetIconCount();
+        for (int i = 0; i < count && i < 5; ++i) {
+            g_iconManager.PinIcon(i, r1.left + 20 + (i % 3) * 80, r1.top + 40 + (i / 3) * 80);
+        }
+    }
+
+    AutoSorter sorter(g_zoneManager, g_iconManager);
+    sorter.MapExtensionToZone(".pdf", 0); // Map PDFs to Work Files
+    sorter.MapExtensionToZone(".jpg", 1); // Map JPGs to Personal
+    sorter.RunSort();
 
     // Create a basic window for now to ensure compile succeeds
 
