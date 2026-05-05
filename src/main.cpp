@@ -11,7 +11,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         case WM_PAINT: {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hwnd, &ps);
-            FillRect(hdc, &ps.rcPaint, (HBRUSH) (COLOR_WINDOW+1));
+            // Draw a semi-transparent black background for testing the overlay
+            HBRUSH brush = CreateSolidBrush(RGB(50, 50, 50));
+            FillRect(hdc, &ps.rcPaint, brush);
+            DeleteObject(brush);
             EndPaint(hwnd, &ps);
             return 0;
         }
@@ -37,12 +40,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Create a basic window for now to ensure compile succeeds
 
     HWND hwnd = CreateWindowEx(
-        0,                              // Optional window styles
+        WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW, // Extended styles for overlay
         CLASS_NAME,                     // Window class
         "DesktopOrg Overlay",           // Window text
-        WS_OVERLAPPEDWINDOW,            // Window style
-        CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, // Size and position
-        NULL,       // Parent window
+        WS_POPUP | WS_VISIBLE,          // Borderless popup
+        0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), // Full screen
+        hooker.GetDesktopWorkerWindow(), // Parent window (The desktop worker)
         NULL,       // Menu
         hInstance,  // Instance handle
         NULL        // Additional application data
@@ -51,6 +54,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (hwnd == NULL) {
         return 0;
     }
+
+    // Set 50% transparency for the overlay
+    SetLayeredWindowAttributes(hwnd, 0, 128, LWA_ALPHA);
+
 
     ShowWindow(hwnd, nCmdShow);
 
