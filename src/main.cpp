@@ -10,7 +10,21 @@ IconManager g_iconManager;
 
 // Window Procedure
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    static bool isVisible = true;
+
     switch (uMsg) {
+        case WM_HOTKEY:
+            if (wParam == 1) { // Our hotkey ID
+                isVisible = !isVisible;
+                ShowWindow(hwnd, isVisible ? SW_SHOW : SW_HIDE);
+            }
+            return 0;
+            
+        case WM_LBUTTONDBLCLK:
+            isVisible = !isVisible;
+            ShowWindow(hwnd, isVisible ? SW_SHOW : SW_HIDE);
+            return 0;
+
         case WM_DESTROY:
             PostQuitMessage(0);
             return 0;
@@ -87,6 +101,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Set 50% transparency for the overlay
     SetLayeredWindowAttributes(hwnd, 0, 128, LWA_ALPHA);
 
+    // Register Ctrl + Shift + D to toggle overlay
+    RegisterHotKey(hwnd, 1, MOD_CONTROL | MOD_SHIFT, 0x44);
 
     ShowWindow(hwnd, nCmdShow);
 
