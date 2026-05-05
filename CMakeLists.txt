@@ -14,6 +14,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 set(SOURCES
     src/main.cpp
     src/desktop_hooker.cpp
+    src/zone_manager.cpp
 )
 
 # Executable

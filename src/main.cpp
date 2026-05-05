@@ -1,6 +1,9 @@
 #include <windows.h>
 #include "desktop_hooker.h"
+#include "zone_manager.h"
 
+// Global zone manager for now
+ZoneManager g_zoneManager;
 
 // Window Procedure
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -11,10 +14,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         case WM_PAINT: {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hwnd, &ps);
-            // Draw a semi-transparent black background for testing the overlay
-            HBRUSH brush = CreateSolidBrush(RGB(50, 50, 50));
-            FillRect(hdc, &ps.rcPaint, brush);
-            DeleteObject(brush);
+            
+            // Clear background with fully transparent color
+            FillRect(hdc, &ps.rcPaint, (HBRUSH)GetStockObject(BLACK_BRUSH)); // Layered window treats black as transparent if colorkey used, or alpha used.
+            
+            // Draw all zones
+            g_zoneManager.DrawZones(hdc);
+            
             EndPaint(hwnd, &ps);
             return 0;
         }
@@ -36,6 +42,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (hooker.Initialize()) {
         // Find successfully
     }
+
+    // Initialize some test zones
+    RECT r1 = {100, 100, 400, 300};
+    g_zoneManager.AddZone(r1, "Work Files", RGB(50, 100, 150));
+    
+    RECT r2 = {500, 100, 800, 300};
+    g_zoneManager.AddZone(r2, "Personal", RGB(150, 100, 50));
 
     // Create a basic window for now to ensure compile succeeds
 
