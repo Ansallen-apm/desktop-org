@@ -1,4 +1,6 @@
 #include <windows.h>
+#include "desktop_hooker.h"
+
 
 // Window Procedure
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -27,7 +29,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     RegisterClass(&wc);
 
+    DesktopHooker hooker;
+    if (hooker.Initialize()) {
+        // Find successfully
+    }
+
     // Create a basic window for now to ensure compile succeeds
+
     HWND hwnd = CreateWindowEx(
         0,                              // Optional window styles
         CLASS_NAME,                     // Window class
