@@ -37,7 +37,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-add_executable(DesktopOrgTests tests/test_zone_manager.cpp ${CORE_SOURCES})
+add_executable(DesktopOrgTests 
+    tests/test_zone_manager.cpp 
+    tests/test_config_manager.cpp
+    tests/test_auto_sorter.cpp
+    ${CORE_SOURCES}
+)
 target_link_libraries(DesktopOrgTests PRIVATE gtest_main gtest user32 gdi32 shell32 comctl32 comdlg32)
 # Ensure tests compile using C++17
 set_property(TARGET DesktopOrgTests PROPERTY CXX_STANDARD 17)

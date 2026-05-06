@@ -3,7 +3,17 @@
 #include <sstream>
 #include <string.h>
 
+std::string ConfigManager::s_overridePath = "";
+
+void ConfigManager::SetOverrideConfigPath(const std::string& path) {
+    s_overridePath = path;
+}
+
 std::string ConfigManager::GetConfigPath() {
+    if (!s_overridePath.empty()) {
+        return s_overridePath;
+    }
+
     char appData[MAX_PATH] = {};
     SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, appData);
     std::string dir = std::string(appData) + "\\DesktopOrg";

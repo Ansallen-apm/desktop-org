@@ -24,13 +24,16 @@ public:
     // Clear all existing extension rules
     void ClearRules();
 
+    // Query mapping for testing
+    int GetMappedZone(const std::string& extension) const;
+
+    // Helper to extract extension from a filename
+    std::string GetExtension(const std::string& filename) const;
+
 private:
     ZoneManager& m_zm;
     IconManager& m_im;
     std::map<std::string, int> m_extensionRules;
-
-    // Helper to extract extension from a filename
-    std::string GetExtension(const std::string& filename) const;
 };
 
 #endif // AUTO_SORTER_H

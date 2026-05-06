@@ -17,8 +17,12 @@ struct ZoneConfig {
 class ConfigManager {
 public:
     static std::string GetConfigPath();
+    static void SetOverrideConfigPath(const std::string& path);
     static void SaveZones(const std::vector<ZoneConfig>& zones);
     static std::vector<ZoneConfig> LoadZones();
+
+private:
+    static std::string s_overridePath;
 };
 
 #endif // CONFIG_MANAGER_H

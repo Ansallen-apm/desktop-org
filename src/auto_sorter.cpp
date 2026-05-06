@@ -22,6 +22,11 @@ void AutoSorter::ClearRules() {
     m_extensionRules.clear();
 }
 
+int AutoSorter::GetMappedZone(const std::string& extension) const {
+    auto it = m_extensionRules.find(extension);
+    return (it != m_extensionRules.end()) ? it->second : -1;
+}
+
 std::string AutoSorter::GetExtension(const std::string& filename) const {
     size_t dotPos = filename.find_last_of('.');
     if (dotPos == std::string::npos) return "";
