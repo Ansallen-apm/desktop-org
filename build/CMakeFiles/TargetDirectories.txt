@@ -1,3 +1,0 @@
-D:/GitHub/AI_SW_Company/projects/desktop-org/build/CMakeFiles/DesktopOrg.dir
-D:/GitHub/AI_SW_Company/projects/desktop-org/build/CMakeFiles/edit_cache.dir
-D:/GitHub/AI_SW_Company/projects/desktop-org/build/CMakeFiles/rebuild_cache.dir
