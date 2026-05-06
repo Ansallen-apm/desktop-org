@@ -94,16 +94,19 @@ void AutoSorter::SyncManualDrags() {
                 int zoneIdx = m_zm.HitTest(pt);
                 if (zoneIdx != -1) {
                     std::string ext = GetExtension(filename);
-                    if (!ext.empty() && m_extensionRules[ext] != zoneIdx) {
-                        m_extensionRules[ext] = zoneIdx;
-                        ruleChanged = true;
-                        
-                        // Update ZoneManager's extension string
-                        std::string currentExts = m_zm.GetZoneExtensions(zoneIdx);
-                        if (currentExts.find(ext) == std::string::npos) {
-                            if (!currentExts.empty()) currentExts += ",";
-                            currentExts += ext;
-                            m_zm.SetZoneExtensions(zoneIdx, currentExts.c_str());
+                    if (!ext.empty()) {
+                        auto ruleIt = m_extensionRules.find(ext);
+                        if (ruleIt == m_extensionRules.end() || ruleIt->second != zoneIdx) {
+                            m_extensionRules[ext] = zoneIdx;
+                            ruleChanged = true;
+                            
+                            // Update ZoneManager's extension string
+                            std::string currentExts = m_zm.GetZoneExtensions(zoneIdx);
+                            if (currentExts.find(ext) == std::string::npos) {
+                                if (!currentExts.empty()) currentExts += ", ";
+                                currentExts += ext;
+                                m_zm.SetZoneExtensions(zoneIdx, currentExts.c_str());
+                            }
                         }
                     }
                 }

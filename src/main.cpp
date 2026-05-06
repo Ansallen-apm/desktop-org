@@ -25,9 +25,12 @@ static void ReloadRules() {
         std::stringstream ss(exts);
         std::string item;
         while (std::getline(ss, item, ',')) {
-            // Trim spaces
-            item.erase(0, item.find_first_not_of(" \t"));
-            item.erase(item.find_last_not_of(" \t") + 1);
+            // Trim spaces safely
+            size_t start = item.find_first_not_of(" \t");
+            if (start == std::string::npos) continue;
+            size_t end = item.find_last_not_of(" \t");
+            item = item.substr(start, end - start + 1);
+            
             if (!item.empty()) {
                 g_pSorter->MapExtensionToZone(item, i);
             }
