@@ -1,5 +1,4 @@
 #include "desktop_hooker.h"
-#include <iostream>
 
 DesktopHooker::DesktopHooker() : m_workerW(NULL) {}
 
@@ -11,6 +10,10 @@ BOOL CALLBACK DesktopHooker::EnumWindowsProc(HWND hwnd, LPARAM lParam) {
         // Find the next sibling of SHELLDLL_DefView which is our WorkerW
         HWND* workerW = reinterpret_cast<HWND*>(lParam);
         *workerW = FindWindowEx(NULL, hwnd, "WorkerW", NULL);
+        // Fix #7: Return FALSE to stop enumeration once we've found our target.
+        // Continuing after finding the result could allow later windows to overwrite
+        // the correct handle with a NULL value.
+        return FALSE;
     }
     return TRUE;
 }
@@ -22,7 +25,7 @@ bool DesktopHooker::Initialize() {
         return false;
     }
 
-    // Send a message to Progman. This undocumented message (0x052C) tells Progman 
+    // Send a message to Progman. This undocumented message (0x052C) tells Progman
     // to spawn a WorkerW window behind the desktop icons.
     SendMessageTimeout(progman, 0x052C, 0, 0, SMTO_NORMAL, 1000, nullptr);
 

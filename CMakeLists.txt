@@ -17,10 +17,11 @@ set(SOURCES
     src/zone_manager.cpp
     src/icon_manager.cpp
     src/auto_sorter.cpp
+    src/config_manager.cpp
 )
 
 # Executable
 add_executable(DesktopOrg WIN32 ${SOURCES})
 
-# Link Windows libraries
-target_link_libraries(DesktopOrg PRIVATE user32 gdi32 shell32)
+# Link Windows libraries (shell32 needed for SHGetFolderPathA in ConfigManager)
+target_link_libraries(DesktopOrg PRIVATE user32 gdi32 shell32 comctl32)

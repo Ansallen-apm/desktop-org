@@ -1,13 +1,19 @@
 #include "auto_sorter.h"
 #include <algorithm>
 
+// Grid layout constants for icon positioning within a zone
+static const int ICON_GRID_WIDTH  = 80;  // Horizontal spacing between icons
+static const int ICON_GRID_HEIGHT = 80;  // Vertical spacing between icons
+static const int ICON_PADDING     = 20;  // Padding from zone left edge
+static const int TITLE_HEIGHT     = 40;  // Reserve space for zone title at top
+
 AutoSorter::AutoSorter(ZoneManager& zm, IconManager& im) : m_zm(zm), m_im(im) {}
 
 AutoSorter::~AutoSorter() {}
 
 void AutoSorter::MapExtensionToZone(const std::string& extension, int zoneIndex) {
     std::string ext = extension;
-    // Normalize to lowercase
+    // Normalize to lowercase for case-insensitive matching
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
     m_extensionRules[ext] = zoneIndex;
 }
@@ -20,33 +26,47 @@ std::string AutoSorter::GetExtension(const std::string& filename) const {
     return ext;
 }
 
+// Fix #10: Full implementation using VirtualAllocEx IPC via IconManager::GetIconName
 bool AutoSorter::RunSort() {
     int iconCount = m_im.GetIconCount();
     if (iconCount == 0) return false;
 
-    // In a real implementation, we would use VirtualAllocEx and ReadProcessMemory
-    // to allocate memory in the Explorer.exe process, send LVM_GETITEMTEXT to 
-    // the SysListView32, and read the string back to get the file names.
-    // 
-    // For this prototype architecture, we mock the detection:
-    // We assume we know the mapping. Let's conceptually iterate:
-    
-    // std::vector<int> zoneCounters(10, 0); // Keep track of how many items in each zone
-    
-    // for (int i = 0; i < iconCount; ++i) {
-    //     std::string filename = m_im.GetIconName(i); // Requires IPC
-    //     std::string ext = GetExtension(filename);
-    //     
-    //     auto it = m_extensionRules.find(ext);
-    //     if (it != m_extensionRules.end()) {
-    //         int targetZoneIndex = it->second;
-    //         // Calculate grid position within the target zone
-    //         // RECT zRect = m_zm.GetZoneRect(targetZoneIndex);
-    //         // int x = zRect.left + ...
-    //         // int y = zRect.top + ...
-    //         // m_im.PinIcon(i, x, y);
-    //     }
-    // }
+    int zoneCount = m_zm.GetZoneCount();
+    // Track how many icons have been placed in each zone (for grid layout)
+    std::vector<int> zoneItemCounters(zoneCount, 0);
+
+    for (int i = 0; i < iconCount; ++i) {
+        // Read the icon label via cross-process memory read from Explorer.exe
+        std::string filename = m_im.GetIconName(i);
+        if (filename.empty()) continue;
+
+        std::string ext = GetExtension(filename);
+        if (ext.empty()) continue;
+
+        auto it = m_extensionRules.find(ext);
+        if (it == m_extensionRules.end()) continue;
+
+        int targetZoneIndex = it->second;
+        if (targetZoneIndex < 0 || targetZoneIndex >= zoneCount) continue;
+
+        RECT zRect = m_zm.GetZoneRect(targetZoneIndex);
+        int zoneWidth = zRect.right - zRect.left;
+        if (zoneWidth <= 0) continue;
+
+        // Calculate how many icon columns fit within the zone
+        int cols = (zoneWidth - ICON_PADDING) / ICON_GRID_WIDTH;
+        if (cols < 1) cols = 1;
+
+        int itemsPlaced = zoneItemCounters[targetZoneIndex];
+        int col = itemsPlaced % cols;
+        int row = itemsPlaced / cols;
+
+        int x = zRect.left + ICON_PADDING + col * ICON_GRID_WIDTH;
+        int y = zRect.top + TITLE_HEIGHT + row * ICON_GRID_HEIGHT;
+
+        m_im.PinIcon(i, x, y);
+        zoneItemCounters[targetZoneIndex]++;
+    }
 
     return true;
 }
