@@ -4,3 +4,5 @@ build/
 *.ilk
 *.obj
 *.d
+
+crew-manifest.md
