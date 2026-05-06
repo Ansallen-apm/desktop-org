@@ -1,21 +1,33 @@
-Write-Host "Building DesktopOrg..." -ForegroundColor Cyan
+param([switch]$Release)
 
-if (-Not (Test-Path "build")) {
-    New-Item -ItemType Directory -Force -Path "build" | Out-Null
+$config = if ($Release) { "Release" } else { "Debug" }
+Write-Host "Building DesktopOrg [$config]..." -ForegroundColor Cyan
+
+$vcvars = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat"
+$cmake  = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+
+if (-Not (Test-Path $vcvars)) {
+    Write-Host "MSVC not found. Please install Visual Studio Build Tools." -ForegroundColor Red
+    exit 1
 }
 
-cd build
-cmake ..
+if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
+New-Item -ItemType Directory -Path "build" | Out-Null
+
+$buildType = if ($Release) { "Release" } else { "Debug" }
+
+$result = cmd /c "`"$vcvars`" x64 && cd build && `"$cmake`" -G `"NMake Makefiles`" -DCMAKE_BUILD_TYPE=$buildType .. && nmake" 2>&1
+$result | Write-Host
+
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "CMake configuration failed." -ForegroundColor Red
+    Write-Host "Build FAILED." -ForegroundColor Red
     exit $LASTEXITCODE
 }
 
-cmake --build . --config Release
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Build failed." -ForegroundColor Red
-    exit $LASTEXITCODE
-}
-
-Write-Host "Build completed successfully! Executable is in build/Release/DesktopOrg.exe" -ForegroundColor Green
-cd ..
+$exe = "build\DesktopOrg.exe"
+$size = (Get-Item $exe).Length
+Write-Host ""
+Write-Host "Build SUCCESS [$config]" -ForegroundColor Green
+Write-Host "Output : $exe ($([math]::Round($size/1KB, 1)) KB)" -ForegroundColor Green
+Write-Host ""
+Write-Host "To run: .\build\DesktopOrg.exe" -ForegroundColor Yellow

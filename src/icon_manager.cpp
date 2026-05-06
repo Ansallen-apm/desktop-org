@@ -1,41 +1,33 @@
 #include "icon_manager.h"
-#include <string>
 
 IconManager::IconManager() : m_hListView(NULL), m_explorerPid(0) {}
-
 IconManager::~IconManager() {}
 
 HWND IconManager::FindDesktopListView() {
-    HWND hShellViewWin = NULL;
-    HWND hWorkerW = NULL;
-    // Fix #6: Use NULL window title for Progman — more reliable
-    HWND hProgman = FindWindow("Progman", NULL);
-    HWND hDesktopWnd = GetDesktopWindow();
+    HWND hShellView = NULL;
+    HWND hWorkerW   = NULL;
+    HWND hProgman   = FindWindow("Progman", NULL);
+    HWND hDesktop   = GetDesktopWindow();
 
-    if (hProgman != NULL) {
-        hShellViewWin = FindWindowEx(hProgman, NULL, "SHELLDLL_DefView", NULL);
-        if (hShellViewWin == NULL) {
-            // Fix #6: Explicitly guard against NULL hWorkerW before calling FindWindowEx
+    if (hProgman) {
+        hShellView = FindWindowEx(hProgman, NULL, "SHELLDLL_DefView", NULL);
+        if (!hShellView) {
             do {
-                hWorkerW = FindWindowEx(hDesktopWnd, hWorkerW, "WorkerW", NULL);
-                if (hWorkerW == NULL) break; // Guard: no more WorkerW windows to check
-                hShellViewWin = FindWindowEx(hWorkerW, NULL, "SHELLDLL_DefView", NULL);
-            } while (hShellViewWin == NULL);
+                hWorkerW = FindWindowEx(hDesktop, hWorkerW, "WorkerW", NULL);
+                if (!hWorkerW) break;
+                hShellView = FindWindowEx(hWorkerW, NULL, "SHELLDLL_DefView", NULL);
+            } while (!hShellView);
         }
     }
-
-    if (hShellViewWin != NULL) {
-        return FindWindowEx(hShellViewWin, NULL, "SysListView32", "FolderView");
-    }
+    if (hShellView)
+        return FindWindowEx(hShellView, NULL, "SysListView32", "FolderView");
     return NULL;
 }
 
 bool IconManager::Initialize() {
     m_hListView = FindDesktopListView();
-    if (m_hListView) {
-        // Cache the PID of the Explorer process for future IPC calls
+    if (m_hListView)
         GetWindowThreadProcessId(m_hListView, &m_explorerPid);
-    }
     return m_hListView != NULL;
 }
 
@@ -46,64 +38,54 @@ int IconManager::GetIconCount() const {
 
 bool IconManager::PinIcon(int index, int x, int y) {
     if (!m_hListView) return false;
-
-    // Fix #5: Validate index before sending to SysListView32
     int count = GetIconCount();
     if (index < 0 || index >= count) return false;
-
-    // Send LVM_SETITEMPOSITION to move the icon.
-    // Note: "Auto Arrange" must be disabled on the desktop for this to persist.
-    return SendMessage(m_hListView, LVM_SETITEMPOSITION, (WPARAM)index, MAKELPARAM(x, y)) == TRUE;
+    return SendMessage(m_hListView, LVM_SETITEMPOSITION,
+        (WPARAM)index, MAKELPARAM(x, y)) == TRUE;
 }
 
-// Fix #10: Implement cross-process memory access to read icon filename from Explorer.exe
 std::string IconManager::GetIconName(int index) const {
     if (!m_hListView || m_explorerPid == 0) return "";
+    if (index < 0 || index >= GetIconCount()) return "";
 
-    int count = GetIconCount();
-    if (index < 0 || index >= count) return "";
-
-    // Open a handle to the Explorer process with required permissions
-    HANDLE hProcess = OpenProcess(
+    HANDLE hProc = OpenProcess(
         PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE,
-        FALSE, m_explorerPid
-    );
-    if (!hProcess) return "";
+        FALSE, m_explorerPid);
+    if (!hProc) return "";
 
-    const int BUFFER_SIZE = MAX_PATH;
+    const int BUF = MAX_PATH;
+    void* pMem = VirtualAllocEx(hProc, NULL, sizeof(LVITEMA) + BUF,
+        MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    if (!pMem) { CloseHandle(hProc); return ""; }
 
-    // Allocate a contiguous block: LVITEM struct + text buffer in the remote process
-    void* pRemoteMem = VirtualAllocEx(
-        hProcess, NULL,
-        sizeof(LVITEMA) + BUFFER_SIZE,
-        MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE
-    );
-    if (!pRemoteMem) {
-        CloseHandle(hProcess);
-        return "";
-    }
-
-    // The text buffer is placed immediately after the LVITEM struct
-    char* pRemoteText = (char*)pRemoteMem + sizeof(LVITEMA);
-
-    // Prepare the local LVITEM and write it to the remote process
+    char*   pRemText = (char*)pMem + sizeof(LVITEMA);
     LVITEMA lvi = {};
-    lvi.mask       = LVIF_TEXT;
-    lvi.iItem      = index;
-    lvi.iSubItem   = 0;
-    lvi.pszText    = pRemoteText; // Points to the buffer in remote process space
-    lvi.cchTextMax = BUFFER_SIZE;
-    WriteProcessMemory(hProcess, pRemoteMem, &lvi, sizeof(LVITEMA), NULL);
+    lvi.mask = LVIF_TEXT; lvi.iItem = index;
+    lvi.pszText = pRemText; lvi.cchTextMax = BUF;
+    WriteProcessMemory(hProc, pMem, &lvi, sizeof(LVITEMA), NULL);
+    SendMessage(m_hListView, LVM_GETITEMA, (WPARAM)index, (LPARAM)pMem);
 
-    // Send the message — Explorer fills in pszText inside its own memory space
-    SendMessage(m_hListView, LVM_GETITEMA, (WPARAM)index, (LPARAM)pRemoteMem);
+    char local[MAX_PATH] = {};
+    ReadProcessMemory(hProc, pRemText, local, BUF - 1, NULL);
+    VirtualFreeEx(hProc, pMem, 0, MEM_RELEASE);
+    CloseHandle(hProc);
+    return std::string(local);
+}
 
-    // Read the result back into our local buffer
-    char localText[MAX_PATH] = {};
-    ReadProcessMemory(hProcess, pRemoteText, localText, BUFFER_SIZE - 1, NULL);
+// P3: Check if the desktop ListView has LVS_AUTOARRANGE style
+bool IconManager::IsAutoArrangeEnabled() const {
+    if (!m_hListView) return false;
+    LONG_PTR style = GetWindowLongPtr(m_hListView, GWL_STYLE);
+    return (style & LVS_AUTOARRANGE) != 0;
+}
 
-    VirtualFreeEx(hProcess, pRemoteMem, 0, MEM_RELEASE);
-    CloseHandle(hProcess);
-
-    return std::string(localText);
+// P3: Remove LVS_AUTOARRANGE so PinIcon positions are respected
+bool IconManager::DisableAutoArrange() {
+    if (!m_hListView) return false;
+    LONG_PTR style = GetWindowLongPtr(m_hListView, GWL_STYLE);
+    if (!(style & LVS_AUTOARRANGE)) return true; // already off
+    style &= ~(LONG_PTR)LVS_AUTOARRANGE;
+    SetWindowLongPtr(m_hListView, GWL_STYLE, style);
+    // Verify
+    return !(GetWindowLongPtr(m_hListView, GWL_STYLE) & LVS_AUTOARRANGE);
 }
