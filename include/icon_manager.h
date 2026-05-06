@@ -15,6 +15,7 @@ public:
     int  GetIconCount() const;
     bool PinIcon(int index, int x, int y);
     std::string GetIconName(int index) const;
+    POINT GetIconPosition(int index) const;
 
     // P3: Detect and disable "Auto Arrange" so PinIcon takes effect
     bool IsAutoArrangeEnabled() const;

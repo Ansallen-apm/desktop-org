@@ -9,6 +9,7 @@ struct ZoneConfig {
     RECT   rect;
     COLORREF color;
     char   name[64];
+    char   extensions[256];
 };
 
 // Fix #12: Manages persistence of zone configurations using a simple INI file

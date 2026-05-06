@@ -34,6 +34,7 @@ void ConfigManager::SaveZones(const std::vector<ZoneConfig>& zones) {
         WritePrivateProfileStringA(sec, "Bottom", buf, p);
         sprintf_s(buf, "%lu", zones[i].color);
         WritePrivateProfileStringA(sec, "Color",  buf, p);
+        WritePrivateProfileStringA(sec, "Extensions", zones[i].extensions, p);
     }
 }
 
@@ -54,6 +55,7 @@ std::vector<ZoneConfig> ConfigManager::LoadZones() {
         z.rect.right  = GetPrivateProfileIntA(sec, "Right",  300, p);
         z.rect.bottom = GetPrivateProfileIntA(sec, "Bottom", 200, p);
         z.color       = (COLORREF)GetPrivateProfileIntA(sec, "Color", RGB(100,150,255), p);
+        GetPrivateProfileStringA(sec, "Extensions", "", z.extensions, sizeof(z.extensions), p);
         zones.push_back(z);
     }
     return zones;

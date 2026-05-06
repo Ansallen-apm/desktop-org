@@ -24,6 +24,7 @@ void ZoneManager::AddZone(const RECT& rect, const char* name, COLORREF color) {
     z.rect  = rect;
     z.color = color;
     strncpy_s(z.name, sizeof(z.name), name, _TRUNCATE);
+    z.extensions[0] = '\0';
     m_zones.push_back(z);
     m_brushCache.push_back(CreateSolidBrush(color));
 }
@@ -37,6 +38,11 @@ void ZoneManager::SetZoneColor(int index, COLORREF color) {
 void ZoneManager::SetZoneName(int index, const char* name) {
     if (index < 0 || index >= (int)m_zones.size()) return;
     strncpy_s(m_zones[index].name, sizeof(m_zones[index].name), name, _TRUNCATE);
+}
+
+void ZoneManager::SetZoneExtensions(int index, const char* extensions) {
+    if (index < 0 || index >= (int)m_zones.size()) return;
+    strncpy_s(m_zones[index].extensions, sizeof(m_zones[index].extensions), extensions, _TRUNCATE);
 }
 
 void ZoneManager::SetZoneRect(int index, const RECT& rect) {
@@ -97,4 +103,9 @@ COLORREF ZoneManager::GetZoneColor(int index) const {
 const char* ZoneManager::GetZoneName(int index) const {
     if (index < 0 || index >= (int)m_zones.size()) return "";
     return m_zones[index].name;
+}
+
+const char* ZoneManager::GetZoneExtensions(int index) const {
+    if (index < 0 || index >= (int)m_zones.size()) return "";
+    return m_zones[index].extensions;
 }

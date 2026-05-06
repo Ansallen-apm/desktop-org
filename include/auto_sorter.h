@@ -18,6 +18,12 @@ public:
     // Run the sorting algorithm: reads desktop icons and moves them to their mapped zones
     bool RunSort();
 
+    // Check if icons have moved manually into a zone and snap them to grid
+    void SyncManualDrags();
+
+    // Clear all existing extension rules
+    void ClearRules();
+
 private:
     ZoneManager& m_zm;
     IconManager& m_im;

@@ -7,11 +7,33 @@
 #include "auto_sorter.h"
 #include "config_manager.h"
 #include "dialog_helper.h"
+#include <sstream>
+#include <vector>
+#include <string>
 
 // ─── Globals ─────────────────────────────────────────────────────────────────
 ZoneManager g_zoneManager;
 IconManager g_iconManager;
 AutoSorter* g_pSorter = nullptr;
+
+static void ReloadRules() {
+    if (!g_pSorter) return;
+    g_pSorter->ClearRules();
+    int count = g_zoneManager.GetZoneCount();
+    for (int i = 0; i < count; ++i) {
+        std::string exts = g_zoneManager.GetZoneExtensions(i);
+        std::stringstream ss(exts);
+        std::string item;
+        while (std::getline(ss, item, ',')) {
+            // Trim spaces
+            item.erase(0, item.find_first_not_of(" \t"));
+            item.erase(item.find_last_not_of(" \t") + 1);
+            if (!item.empty()) {
+                g_pSorter->MapExtensionToZone(item, i);
+            }
+        }
+    }
+}
 
 // ─── System Tray ─────────────────────────────────────────────────────────────
 static const UINT WM_TRAYICON      = WM_USER + 1;
@@ -123,6 +145,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     case WM_CLOSE:
         RemoveTrayIcon(hwnd);
         DestroyWindow(hwnd);
+        return 0;
+
+    case WM_TIMER:
+        if (wParam == 1 && g_pSorter) {
+            g_pSorter->SyncManualDrags();
+        }
         return 0;
 
     // ── Tray icon messages ──────────────────────────────────────────────────
@@ -250,6 +278,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             HMENU hm = CreatePopupMenu();
             AppendMenuA(hm, MF_STRING, 1001, "Change Color");
             AppendMenuA(hm, MF_STRING, 1002, "Rename Zone");
+            AppendMenuA(hm, MF_STRING, 1004, "Edit Extensions (.pdf, .jpg...)");
             AppendMenuA(hm, MF_STRING, 1003, "Delete Zone");
             int cmd = TrackPopupMenu(hm, TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y, 0, hwnd, NULL);
             DestroyMenu(hm);
@@ -266,6 +295,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     g_zoneManager.SetZoneName(idx, name);
                     InvalidateRect(hwnd, NULL, TRUE);
                 }
+            } else if (cmd == 1004) {
+                char exts[256];
+                strncpy_s(exts, g_zoneManager.GetZoneExtensions(idx), _TRUNCATE);
+                if (ShowInputDialog(hwnd, "Extensions (e.g. .pdf, .jpg):", exts, sizeof(exts))) {
+                    g_zoneManager.SetZoneExtensions(idx, exts);
+                    ReloadRules();
+                    SaveLayout(hwnd); // Auto-save when rules change
+                    if (g_pSorter) g_pSorter->RunSort();
+                    InvalidateRect(hwnd, NULL, TRUE);
+                }
             } else if (cmd == 1003) {
                 // Rebuild without this zone
                 std::vector<ZoneConfig> cfgs;
@@ -276,11 +315,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     z.rect  = g_zoneManager.GetZoneRect(i);
                     z.color = g_zoneManager.GetZoneColor(i);
                     strncpy_s(z.name, g_zoneManager.GetZoneName(i), _TRUNCATE);
+                    strncpy_s(z.extensions, g_zoneManager.GetZoneExtensions(i), _TRUNCATE);
                     cfgs.push_back(z);
                 }
                 // Rebuild ZoneManager
                 g_zoneManager = ZoneManager();
-                for (auto& z : cfgs) g_zoneManager.AddZone(z.rect, z.name, z.color);
+                for (auto& z : cfgs) {
+                    g_zoneManager.AddZone(z.rect, z.name, z.color);
+                    g_zoneManager.SetZoneExtensions(g_zoneManager.GetZoneCount()-1, z.extensions);
+                }
+                ReloadRules();
                 InvalidateRect(hwnd, NULL, TRUE);
             }
         }
@@ -330,12 +374,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // Load saved zones, or create defaults
     auto saved = ConfigManager::LoadZones();
     if (!saved.empty()) {
-        for (auto& z : saved) g_zoneManager.AddZone(z.rect, z.name, z.color);
+        for (auto& z : saved) {
+            g_zoneManager.AddZone(z.rect, z.name, z.color);
+            g_zoneManager.SetZoneExtensions(g_zoneManager.GetZoneCount()-1, z.extensions);
+        }
     } else {
         RECT r1 = {100, 100, 400, 300};
         g_zoneManager.AddZone(r1, "Work Files", RGB(50, 100, 150));
+        g_zoneManager.SetZoneExtensions(0, ".pdf, .docx, .xlsx");
         RECT r2 = {500, 100, 800, 300};
-        g_zoneManager.AddZone(r2, "Personal",   RGB(150, 100, 50));
+        g_zoneManager.AddZone(r2, "Media",   RGB(150, 100, 50));
+        g_zoneManager.SetZoneExtensions(1, ".jpg, .png, .mp4");
     }
 
     // Setup icon manager and auto-sorter
@@ -354,14 +403,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         }
 
         static AutoSorter sorter(g_zoneManager, g_iconManager);
-        sorter.MapExtensionToZone(".pdf",  0);
-        sorter.MapExtensionToZone(".docx", 0);
-        sorter.MapExtensionToZone(".xlsx", 0);
-        sorter.MapExtensionToZone(".jpg",  1);
-        sorter.MapExtensionToZone(".png",  1);
-        sorter.MapExtensionToZone(".mp4",  1);
-        sorter.RunSort();
         g_pSorter = &sorter;
+        ReloadRules();
+        sorter.RunSort();
     }
 
     // Create overlay window (no WS_EX_TRANSPARENT; handled via WM_NCHITTEST)
@@ -369,7 +413,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         WS_EX_LAYERED | WS_EX_TOOLWINDOW,
         CLASS_NAME, "DesktopOrg Overlay",
         WS_POPUP | WS_VISIBLE,
-        0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN),
+        GetSystemMetrics(SM_XVIRTUALSCREEN), GetSystemMetrics(SM_YVIRTUALSCREEN),
+        GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN),
         workerW, NULL, hInstance, NULL
     );
     if (!hwnd) {
@@ -387,6 +432,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     AddTrayIcon(hwnd);
     ShowWindow(hwnd, nCmdShow);
+
+    // Sync timer every 1 second
+    SetTimer(hwnd, 1, 1000, NULL);
 
     MSG msg = {};
     while (GetMessage(&msg, NULL, 0, 0) > 0) {

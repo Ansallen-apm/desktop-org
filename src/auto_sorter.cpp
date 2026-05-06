@@ -18,6 +18,10 @@ void AutoSorter::MapExtensionToZone(const std::string& extension, int zoneIndex)
     m_extensionRules[ext] = zoneIndex;
 }
 
+void AutoSorter::ClearRules() {
+    m_extensionRules.clear();
+}
+
 std::string AutoSorter::GetExtension(const std::string& filename) const {
     size_t dotPos = filename.find_last_of('.');
     if (dotPos == std::string::npos) return "";
@@ -69,4 +73,46 @@ bool AutoSorter::RunSort() {
     }
 
     return true;
+}
+
+void AutoSorter::SyncManualDrags() {
+    static std::map<std::string, POINT> lastPositions;
+    int iconCount = m_im.GetIconCount();
+    bool ruleChanged = false;
+
+    for (int i = 0; i < iconCount; ++i) {
+        POINT pt = m_im.GetIconPosition(i);
+        if (pt.x == -1 && pt.y == -1) continue;
+
+        std::string filename = m_im.GetIconName(i);
+        if (filename.empty()) continue;
+
+        auto it = lastPositions.find(filename);
+        if (it != lastPositions.end()) {
+            if (it->second.x != pt.x || it->second.y != pt.y) {
+                // Icon moved manually!
+                int zoneIdx = m_zm.HitTest(pt);
+                if (zoneIdx != -1) {
+                    std::string ext = GetExtension(filename);
+                    if (!ext.empty() && m_extensionRules[ext] != zoneIdx) {
+                        m_extensionRules[ext] = zoneIdx;
+                        ruleChanged = true;
+                        
+                        // Update ZoneManager's extension string
+                        std::string currentExts = m_zm.GetZoneExtensions(zoneIdx);
+                        if (currentExts.find(ext) == std::string::npos) {
+                            if (!currentExts.empty()) currentExts += ",";
+                            currentExts += ext;
+                            m_zm.SetZoneExtensions(zoneIdx, currentExts.c_str());
+                        }
+                    }
+                }
+            }
+        }
+        lastPositions[filename] = pt;
+    }
+
+    if (ruleChanged) {
+        RunSort();
+    }
 }

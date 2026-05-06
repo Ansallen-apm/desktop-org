@@ -8,6 +8,7 @@ struct Zone {
     RECT     rect;
     COLORREF color;
     char     name[64];
+    char     extensions[256];
 };
 
 class ZoneManager {
@@ -22,6 +23,7 @@ public:
     void SetZoneColor(int index, COLORREF color);
     void SetZoneName(int index, const char* name);
     void SetZoneRect(int index, const RECT& rect);
+    void SetZoneExtensions(int index, const char* extensions);
 
     // --- Query ---
     int     HitTest(POINT pt) const;
@@ -29,6 +31,7 @@ public:
     RECT    GetZoneRect(int index) const;
     COLORREF GetZoneColor(int index) const;
     const char* GetZoneName(int index) const;
+    const char* GetZoneExtensions(int index) const;
     int     GetZoneCount() const { return (int)m_zones.size(); }
 
 private:

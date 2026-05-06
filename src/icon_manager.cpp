@@ -72,6 +72,29 @@ std::string IconManager::GetIconName(int index) const {
     return std::string(local);
 }
 
+POINT IconManager::GetIconPosition(int index) const {
+    POINT pt = {-1, -1};
+    if (!m_hListView || m_explorerPid == 0) return pt;
+    if (index < 0 || index >= GetIconCount()) return pt;
+
+    HANDLE hProc = OpenProcess(
+        PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE,
+        FALSE, m_explorerPid);
+    if (!hProc) return pt;
+
+    POINT* pMem = (POINT*)VirtualAllocEx(hProc, NULL, sizeof(POINT),
+        MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    if (!pMem) { CloseHandle(hProc); return pt; }
+
+    if (SendMessage(m_hListView, LVM_GETITEMPOSITION, (WPARAM)index, (LPARAM)pMem)) {
+        ReadProcessMemory(hProc, pMem, &pt, sizeof(POINT), NULL);
+    }
+
+    VirtualFreeEx(hProc, pMem, 0, MEM_RELEASE);
+    CloseHandle(hProc);
+    return pt;
+}
+
 // P3: Check if the desktop ListView has LVS_AUTOARRANGE style
 bool IconManager::IsAutoArrangeEnabled() const {
     if (!m_hListView) return false;
