@@ -29,6 +29,18 @@ void ZoneManager::AddZone(const RECT& rect, const char* name, COLORREF color) {
     m_brushCache.push_back(CreateSolidBrush(color));
 }
 
+void ZoneManager::RemoveZone(int index) {
+    if (index < 0 || index >= (int)m_zones.size()) return;
+    
+    // Clean up the GDI brush before removing
+    if (m_brushCache[index]) {
+        DeleteObject(m_brushCache[index]);
+    }
+    
+    m_zones.erase(m_zones.begin() + index);
+    m_brushCache.erase(m_brushCache.begin() + index);
+}
+
 void ZoneManager::SetZoneColor(int index, COLORREF color) {
     if (index < 0 || index >= (int)m_zones.size()) return;
     m_zones[index].color = color;

@@ -16,7 +16,12 @@ public:
     ZoneManager();
     ~ZoneManager();
 
+    // Prevent copy/assignment to avoid GDI handle double-free/leak
+    ZoneManager(const ZoneManager&) = delete;
+    ZoneManager& operator=(const ZoneManager&) = delete;
+
     void AddZone(const RECT& rect, const char* name, COLORREF color = RGB(100, 150, 255));
+    void RemoveZone(int index);
     void DrawZones(HDC hdc, const RECT* pClipRect = nullptr);
 
     // --- Mutation ---

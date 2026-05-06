@@ -309,24 +309,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     InvalidateRect(hwnd, NULL, TRUE);
                 }
             } else if (cmd == 1003) {
-                // Rebuild without this zone
-                std::vector<ZoneConfig> cfgs;
-                int n = g_zoneManager.GetZoneCount();
-                for (int i = 0; i < n; ++i) {
-                    if (i == idx) continue;
-                    ZoneConfig z = {};
-                    z.rect  = g_zoneManager.GetZoneRect(i);
-                    z.color = g_zoneManager.GetZoneColor(i);
-                    strncpy_s(z.name, g_zoneManager.GetZoneName(i), _TRUNCATE);
-                    strncpy_s(z.extensions, g_zoneManager.GetZoneExtensions(i), _TRUNCATE);
-                    cfgs.push_back(z);
-                }
-                // Rebuild ZoneManager
-                g_zoneManager = ZoneManager();
-                for (auto& z : cfgs) {
-                    g_zoneManager.AddZone(z.rect, z.name, z.color);
-                    g_zoneManager.SetZoneExtensions(g_zoneManager.GetZoneCount()-1, z.extensions);
-                }
+                // Remove zone cleanly avoiding GDI leak
+                g_zoneManager.RemoveZone(idx);
                 ReloadRules();
                 InvalidateRect(hwnd, NULL, TRUE);
             }
