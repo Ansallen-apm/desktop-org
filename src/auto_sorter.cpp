@@ -37,19 +37,17 @@ std::string AutoSorter::GetExtension(const std::string& filename) const {
 
 // Fix #10: Full implementation using VirtualAllocEx IPC via IconManager::GetIconName
 bool AutoSorter::RunSort() {
-    int iconCount = m_im.GetIconCount();
-    if (iconCount == 0) return false;
+    std::vector<IconData> icons = m_im.GetAllIcons();
+    if (icons.empty()) return false;
 
     int zoneCount = m_zm.GetZoneCount();
     // Track how many icons have been placed in each zone (for grid layout)
     std::vector<int> zoneItemCounters(zoneCount, 0);
 
-    for (int i = 0; i < iconCount; ++i) {
-        // Read the icon label via cross-process memory read from Explorer.exe
-        std::string filename = m_im.GetIconName(i);
-        if (filename.empty()) continue;
+    for (const auto& icon : icons) {
+        if (icon.name.empty()) continue;
 
-        std::string ext = GetExtension(filename);
+        std::string ext = GetExtension(icon.name);
         if (ext.empty()) continue;
 
         auto it = m_extensionRules.find(ext);
@@ -73,7 +71,7 @@ bool AutoSorter::RunSort() {
         int x = zRect.left + ICON_PADDING + col * ICON_GRID_WIDTH;
         int y = zRect.top + TITLE_HEIGHT + row * ICON_GRID_HEIGHT;
 
-        m_im.PinIcon(i, x, y);
+        m_im.PinIcon(icon.index, x, y);
         zoneItemCounters[targetZoneIndex]++;
     }
 
@@ -81,24 +79,26 @@ bool AutoSorter::RunSort() {
 }
 
 void AutoSorter::SyncManualDrags() {
+    // SECURITY/RACE-CONDITION FIX:
+    // If the left mouse button is held down, the user is likely dragging an icon.
+    // Syncing now will steal the icon from the user's cursor mid-drag.
+    if (GetAsyncKeyState(VK_LBUTTON) & 0x8000) return;
+
     static std::map<std::string, POINT> lastPositions;
-    int iconCount = m_im.GetIconCount();
+    std::vector<IconData> icons = m_im.GetAllIcons();
     bool ruleChanged = false;
 
-    for (int i = 0; i < iconCount; ++i) {
-        POINT pt = m_im.GetIconPosition(i);
-        if (pt.x == -1 && pt.y == -1) continue;
+    for (const auto& icon : icons) {
+        if (icon.pt.x == -1 && icon.pt.y == -1) continue;
+        if (icon.name.empty()) continue;
 
-        std::string filename = m_im.GetIconName(i);
-        if (filename.empty()) continue;
-
-        auto it = lastPositions.find(filename);
+        auto it = lastPositions.find(icon.name);
         if (it != lastPositions.end()) {
-            if (it->second.x != pt.x || it->second.y != pt.y) {
+            if (it->second.x != icon.pt.x || it->second.y != icon.pt.y) {
                 // Icon moved manually!
-                int zoneIdx = m_zm.HitTest(pt);
+                int zoneIdx = m_zm.HitTest(icon.pt);
                 if (zoneIdx != -1) {
-                    std::string ext = GetExtension(filename);
+                    std::string ext = GetExtension(icon.name);
                     if (!ext.empty()) {
                         auto ruleIt = m_extensionRules.find(ext);
                         if (ruleIt == m_extensionRules.end() || ruleIt->second != zoneIdx) {
@@ -117,7 +117,7 @@ void AutoSorter::SyncManualDrags() {
                 }
             }
         }
-        lastPositions[filename] = pt;
+        lastPositions[icon.name] = icon.pt;
     }
 
     if (ruleChanged) {

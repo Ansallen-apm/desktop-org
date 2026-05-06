@@ -6,12 +6,12 @@ class ConfigManagerTest : public ::testing::Test {
 protected:
     void SetUp() override {
         // Use a local temp config file instead of the real APPDATA one
-        ConfigManager::SetOverrideConfigPath("test_config.ini");
-        DeleteFileA("test_config.ini");
+        ConfigManager::SetOverrideConfigPath(".\\test_config.ini");
+        DeleteFileA(".\\test_config.ini");
     }
 
     void TearDown() override {
-        DeleteFileA("test_config.ini");
+        DeleteFileA(".\\test_config.ini");
         ConfigManager::SetOverrideConfigPath("");
     }
 };

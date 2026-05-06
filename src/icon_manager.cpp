@@ -95,6 +95,61 @@ POINT IconManager::GetIconPosition(int index) const {
     return pt;
 }
 
+std::vector<IconData> IconManager::GetAllIcons() const {
+    std::vector<IconData> icons;
+    if (!m_hListView || m_explorerPid == 0) return icons;
+
+    int count = GetIconCount();
+    if (count <= 0) return icons;
+
+    HANDLE hProc = OpenProcess(
+        PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE,
+        FALSE, m_explorerPid);
+    if (!hProc) return icons;
+
+    const int BUF = MAX_PATH;
+    // Allocate enough space for LVITEMA + string buffer + POINT
+    size_t allocSize = sizeof(LVITEMA) + BUF + sizeof(POINT);
+    void* pMem = VirtualAllocEx(hProc, NULL, allocSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    if (!pMem) {
+        CloseHandle(hProc);
+        return icons;
+    }
+
+    char* pRemText = (char*)pMem + sizeof(LVITEMA);
+    POINT* pRemPt = (POINT*)(pRemText + BUF);
+
+    for (int i = 0; i < count; ++i) {
+        IconData data;
+        data.index = i;
+        data.pt = {-1, -1};
+
+        // Get Position
+        if (SendMessage(m_hListView, LVM_GETITEMPOSITION, (WPARAM)i, (LPARAM)pRemPt)) {
+            ReadProcessMemory(hProc, pRemPt, &data.pt, sizeof(POINT), NULL);
+        }
+
+        // Get Name
+        LVITEMA lvi = {};
+        lvi.mask = LVIF_TEXT;
+        lvi.iItem = i;
+        lvi.pszText = pRemText;
+        lvi.cchTextMax = BUF;
+        WriteProcessMemory(hProc, pMem, &lvi, sizeof(LVITEMA), NULL);
+        SendMessage(m_hListView, LVM_GETITEMA, (WPARAM)i, (LPARAM)pMem);
+
+        char local[MAX_PATH] = {};
+        ReadProcessMemory(hProc, pRemText, local, BUF - 1, NULL);
+        data.name = std::string(local);
+
+        icons.push_back(data);
+    }
+
+    VirtualFreeEx(hProc, pMem, 0, MEM_RELEASE);
+    CloseHandle(hProc);
+    return icons;
+}
+
 // P3: Check if the desktop ListView has LVS_AUTOARRANGE style
 bool IconManager::IsAutoArrangeEnabled() const {
     if (!m_hListView) return false;
